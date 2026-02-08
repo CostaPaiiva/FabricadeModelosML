@@ -1,11 +1,9 @@
-# ============================================
 # Deploy App (Streamlit) - Predições com Probabilidades
 # - Carrega best_model_pipeline.pkl (PyCaret) ou upload do .pkl
 # - Upload de CSV novo
 # - Detecta Classificação vs Regressão
 # - Classificação: prediction_label + prediction_score + Score_<classe> (raw_score=True)
 # - Download do CSV com previsões
-# ============================================
 
 import io
 import os

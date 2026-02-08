@@ -668,16 +668,33 @@ if leaderboard is None:
     st.stop()
 
 st.subheader("4) Dashboard — Ranking dos modelos")
-left, right = st.columns([2, 1])
+left, right = st.columns([1.6, 1.4])
+
 
 with left:
-    st.markdown("### 📋 Tabela (do melhor → pior)")
-    st.dataframe(leaderboard, use_container_width=True)
+    st.markdown("### 🥇 Top 3 modelos")
+
+    if "Model" in leaderboard.columns:
+        top3 = leaderboard.head(3).copy()
+
+        metric_col = None
+        for col in ["AUC", "Accuracy", "R2", "MAE", "RMSE", "MSE"]:
+            if col in top3.columns:
+                metric_col = col
+                break
+
+        medals = ["🥇", "🥈", "🥉"]
+        for idx in range(min(3, len(top3))):
+            m = medals[idx]
+            model_name = str(top3.iloc[idx]["Model"])
+            score_txt = ""
+            if metric_col:
+                score_txt = f" — {metric_col}: {top3.iloc[idx][metric_col]}"
+            st.success(f"{m} {model_name}{score_txt}")
+
 
 with right:
-    st.markdown("### 🏆 Melhor modelo")
-    st.success(best_model_name)
-
+    # Gráfico simples do ranking (top 15) - MAIOR e mais legível
     st.markdown("### 📊 Ranking (top 15)")
     topn = leaderboard.head(15).copy()
 
@@ -688,13 +705,41 @@ with right:
             break
 
     if metric_col and "Model" in topn.columns:
-        fig = plt.figure()
-        plt.barh(topn["Model"].astype(str)[::-1], topn[metric_col][::-1])
-        plt.xlabel(metric_col)
-        plt.ylabel("Model")
-        st.pyplot(fig, clear_figure=True)
+        # Ajusta para 15 modelos
+        n = len(topn)
+
+        # ✅ FIGURA BEM MAIOR (altura cresce com quantidade de modelos)
+        #    (quanto mais alto, mais espaço entre as linhas)
+        fig_w = 18
+        fig_h = max(10, 0.75 * n + 4)  # altura dinâmica
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=200)
+
+        # Ordem invertida para mostrar o melhor no topo
+        models = topn["Model"].astype(str)[::-1]
+        values = topn[metric_col][::-1]
+
+        ax.barh(models, values)
+
+        # ✅ fontes maiores
+        ax.set_xlabel(metric_col, fontsize=18)
+        ax.set_ylabel("Model", fontsize=18)
+        ax.tick_params(axis="both", labelsize=18)
+
+        # ✅ mais espaço para os nomes dos modelos (margem esquerda)
+        plt.subplots_adjust(left=0.40, right=0.98, top=0.95, bottom=0.08)
+
+        # ✅ grade leve pra facilitar leitura (sem cor explícita)
+        ax.grid(axis="x", linestyle="--", alpha=0.4)
+
+        # ✅ mostrar o valor no final de cada barra (ajuda muito)
+        for i, v in enumerate(values):
+            ax.text(v, i, f"  {v:.4f}" if isinstance(v, (float, np.floating)) else f"  {v}",
+                    va="center", fontsize=11)
+
+        st.pyplot(fig, use_container_width=True)
     else:
-        st.info("Não consegui identificar automaticamente uma métrica para plotar.")
+        st.info("Não consegui identificar automaticamente a métrica principal para plotar.")
+
 
 st.subheader("🧪 Validação (CV vs Holdout) e Overfitting")
 metric_pref = st.session_state.metric_pref
