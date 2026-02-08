@@ -19,7 +19,12 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 from reportlab.lib.utils import ImageReader
+import inspect
 
+def call_with_supported_kwargs(func, **kwargs):
+    sig = inspect.signature(func)
+    filtered = {k: v for k, v in kwargs.items() if k in sig.parameters}
+    return func(**filtered)
 
 # ------------------------------------------------------------
 # 1) FUNÇÕES: limpeza, inferência de tarefa, target, etc.
@@ -597,7 +602,7 @@ if train_btn:
                 session_id=int(session_seed),
                 train_size=float(1.0 - test_size),
                 fold=int(fold),
-                silent=True,
+                verbose=False,
                 html=False,
 
                 # Hardening (robustez)
@@ -692,11 +697,11 @@ with left:
                 score_txt = f" — {metric_col}: {top3.iloc[idx][metric_col]}"
             st.success(f"{m} {model_name}{score_txt}")
 
-
+import textwrap
 with right:
-    # Gráfico simples do ranking (top 15) - MAIOR e mais legível
-    st.markdown("### 📊 Ranking (top 15)")
-    topn = leaderboard.head(15).copy()
+    # Gráfico simples do ranking (top 10) - MAIOR e mais legível
+    st.markdown("### 📊 Ranking (top 10)")
+    topn = leaderboard.head(10).copy()
 
     metric_col = None
     for col in ["AUC", "Accuracy", "R2", "MAE", "RMSE", "MSE"]:
@@ -705,40 +710,47 @@ with right:
             break
 
     if metric_col and "Model" in topn.columns:
-        # Ajusta para 15 modelos
         n = len(topn)
 
-        # ✅ FIGURA BEM MAIOR (altura cresce com quantidade de modelos)
-        #    (quanto mais alto, mais espaço entre as linhas)
-        fig_w = 18
-        fig_h = max(10, 0.75 * n + 4)  # altura dinâmica
-        fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=200)
+        # ✅ figura bem grande
+        fig_w = 22
+        fig_h = max(12, 0.85 * n + 6)
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=160)
 
-        # Ordem invertida para mostrar o melhor no topo
-        models = topn["Model"].astype(str)[::-1]
-        values = topn[metric_col][::-1]
+        # ✅ pega dados invertidos (melhor em cima)
+        models_raw = topn["Model"].astype(str)[::-1].tolist()
+        values = topn[metric_col][::-1].tolist()
+
+        # ✅ quebra nomes longos em 2 linhas (ajuda MUITO a ler)
+        models = [textwrap.fill(m, width=26) for m in models_raw]
 
         ax.barh(models, values)
 
         # ✅ fontes maiores
         ax.set_xlabel(metric_col, fontsize=18)
-        ax.set_ylabel("Model", fontsize=18)
-        ax.tick_params(axis="both", labelsize=18)
+        ax.set_ylabel("Modelo", fontsize=18)
 
-        # ✅ mais espaço para os nomes dos modelos (margem esquerda)
-        plt.subplots_adjust(left=0.40, right=0.98, top=0.95, bottom=0.08)
+        # ✅ AQUI é o ponto principal: tamanho dos nomes no eixo Y
+        ax.tick_params(axis="y", labelsize=22)
+        ax.tick_params(axis="x", labelsize=18)
 
-        # ✅ grade leve pra facilitar leitura (sem cor explícita)
-        ax.grid(axis="x", linestyle="--", alpha=0.4)
+        # ✅ margem esquerda maior (para não cortar)
+        plt.subplots_adjust(left=0.42, right=0.98, top=0.95, bottom=0.10)
 
-        # ✅ mostrar o valor no final de cada barra (ajuda muito)
+        # ✅ valores no fim da barra (facilita leitura)
         for i, v in enumerate(values):
-            ax.text(v, i, f"  {v:.4f}" if isinstance(v, (float, np.floating)) else f"  {v}",
-                    va="center", fontsize=11)
+            try:
+                ax.text(v, i, f"  {float(v):.4f}", va="center", fontsize=13)
+            except Exception:
+                ax.text(v, i, f"  {v}", va="center", fontsize=13)
+
+        # ✅ grid leve
+        ax.grid(axis="x", linestyle="--", alpha=0.35)
 
         st.pyplot(fig, use_container_width=True)
     else:
         st.info("Não consegui identificar automaticamente a métrica principal para plotar.")
+
 
 
 st.subheader("🧪 Validação (CV vs Holdout) e Overfitting")
